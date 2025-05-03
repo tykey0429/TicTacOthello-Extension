@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>TicTacOthello Extension</title>
+  <style>
+    body { text-align: center; font-family: sans-serif; }
+    #status, #timer { font-size: 24px; margin: 10px; }
+    button { font-size: 20px; padding: 10px 20px; margin: 10px; }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      width: 90vw;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .cell {
+      aspect-ratio: 1;
+      font-size: 32px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #f0f0f0;
+      border: 1px solid #999;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>TicTacOthello Extension</h1>
+  <div id="status">〇の番です</div>
+  <div id="timer">残り 15 秒</div>
+  <div id="board"></div>
+  <button onclick="resetGame()">リセット</button>
+
+  <script>
+    const SIZE = 7;
+    let board = Array(SIZE).fill(null).map(() => Array(SIZE).fill(""));
+    let currentPlayer = "〇";
+    let timer, timeLeft = 15;
+    let gameActive = true;
+
+    const statusEl = document.getElementById("status");
+    const timerEl = document.getElementById("timer");
+    const boardEl = document.getElementById("board");
+
+    function resetGame() {
+      board = Array(SIZE).fill(null).map(() => Array(SIZE).fill(""));
+      currentPlayer = "〇";
+      gameActive = true;
+      timeLeft = 15;
+      statusEl.textContent = "〇の番です";
+      placeInitialMarks();
+      createBoard();
+      startTimer();
+    }
+
+    function placeInitialMarks() {
+      let positions = [];
+      for (let i = 0; i < SIZE; i++) {
+        if (i === 0 || i === SIZE - 1) {
+          for (let j = 0; j < SIZE; j++) positions.push([i, j]);
+        } else {
+          positions.push([i, 0], [i, SIZE - 1]);
+        }
+      }
+
+      let shuffled = positions.sort(() => Math.random() - 0.5);
+      let placed = false;
+
+      while (!placed) {
+        board = Array(SIZE).fill(null).map(() => Array(SIZE).fill(""));
+        let oCount = 0, xCount = 0;
+
+        for (let [i, j] of shuffled) {
+          if (oCount < 12 && xCount < 12) {
+            if (Math.random() < 0.5) {
+              board[i][j] = "〇";
+              oCount++;
+            } else {
+              board[i][j] = "×";
+              xCount++;
+            }
+          } else if (oCount < 12) {
+            board[i][j] = "〇";
+            oCount++;
+          } else {
+            board[i][j] = "×";
+            xCount++;
+          }
+        }
+
+        if (!checkWin("〇") && !checkWin("×")) placed = true;
+      }
+    }
+
+    function createBoard() {
+      boardEl.innerHTML = "";
+      for (let i = 0; i < SIZE; i++) {
+        for (let j = 0; j < SIZE; j++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          cell.textContent = board[i][j];
+          cell.addEventListener("click", () => handleClick(i, j));
+          boardEl.appendChild(cell);
+        }
+      }
+    }
+
+    function handleClick(row, col) {
+      if (!gameActive || board[row][col]) return;
+
+      board[row][col] = currentPlayer;
+      flipPieces(row, col);
+      createBoard();
+
+      if (checkWin(currentPlayer)) {
+        statusEl.textContent = `${currentPlayer} の勝ち！`;
+        clearInterval(timer);
+        gameActive = false;
+        return;
+      }
+
+      switchPlayer();
+      resetTimer();
+    }
+
+    function switchPlayer() {
+      currentPlayer = currentPlayer === "〇" ? "×" : "〇";
+      statusEl.textContent = `${currentPlayer} の番です`;
+    }
+
+    function startTimer() {
+      clearInterval(timer);
+      timeLeft = 15;
+      timerEl.textContent = `残り ${timeLeft} 秒`;
+      timer = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = `残り ${timeLeft} 秒`;
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          statusEl.textContent = `${currentPlayer} の時間切れ！ 負けです`;
+          gameActive = false;
+        }
+      }, 1000);
+    }
+
+    function resetTimer() {
+      startTimer();
+    }
+
+    function checkWin(player) {
+      const directions = [
+        [1, 0], [0, 1], [1, 1], [1, -1]
+      ];
+
+      for (let i = 0; i < SIZE; i++) {
+        for (let j = 0; j < SIZE; j++) {
+          if (board[i][j] !== player) continue;
+
+          for (let [dx, dy] of directions) {
+            let count = 1;
+            for (let k = 1; k < 5; k++) {
+              const x = i + dx * k;
+              const y = j + dy * k;
+              if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) break;
+              if (board[x][y] === player) count++;
+              else break;
+            }
+            if (count >= 5) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function flipPieces(row, col) {
+      const dirs = [
+        [1, 0], [-1, 0], [0, 1], [0, -1],
+        [1, 1], [-1, -1], [1, -1], [-1, 1]
+      ];
+
+      for (let [dx, dy] of dirs) {
+        let r = row + dx;
+        let c = col + dy;
+        const toFlip = [];
+
+        while (r >= 0 && r < SIZE && c >= 0 && c < SIZE && board[r][c] && board[r][c] !== currentPlayer) {
+          toFlip.push([r, c]);
+          r += dx;
+          c += dy;
+        }
+
+        if (r >= 0 && r < SIZE && c >= 0 && c < SIZE && board[r][c] === currentPlayer) {
+          for (let [fr, fc] of toFlip) {
+            board[fr][fc] = currentPlayer;
+          }
+        }
+      }
+    }
+
+    resetGame();
+  </script>
+</body>
+</html>
